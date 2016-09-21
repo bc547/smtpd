@@ -50,6 +50,7 @@ const (
 	BadCmd Command = iota
 	HELO
 	EHLO
+	XFORWARD
 	MAILFROM
 	RCPTTO
 	DATA
@@ -97,6 +98,7 @@ var smtpCommand = []struct {
 }{
 	{HELO, "HELO", canArg},
 	{EHLO, "EHLO", canArg},
+	{XFORWARD, "XFORWARD", mustArg},
 	{MAILFROM, "MAIL FROM", colonAddress},
 	{RCPTTO, "RCPT TO", colonAddress},
 	{DATA, "DATA", noArg},
@@ -311,6 +313,7 @@ var states = map[Command]struct {
 }{
 	HELO:     {sInitial | sHelo, sHelo},
 	EHLO:     {sInitial | sHelo, sHelo},
+	XFORWARD: {sHelo, sHelo},
 	AUTH:     {sHelo, sHelo},
 	MAILFROM: {sHelo, sMail},
 	RCPTTO:   {sMail | sRcpt, sRcpt},
@@ -585,6 +588,7 @@ func (c *Conn) Accept() {
 		// http://cr.yp.to/smtp/8bitmime.html
 		c.replyMore("250-8BITMIME")
 		c.replyMore("250-PIPELINING")
+		c.replyMore("250-XFORWARD NAME ADDR PORT PROTO HELO IDENT SOURCE")
 		// STARTTLS RFC says: MUST NOT advertise STARTTLS
 		// after TLS is on.
 		if c.Config.TLSConfig != nil && !c.TLSOn {
@@ -612,7 +616,7 @@ func (c *Conn) Accept() {
 	case AUTH:
 		c.authDone(true)
 		c.reply("235 Authentication successful")
-	case MAILFROM, RCPTTO:
+	case MAILFROM, RCPTTO, XFORWARD:
 		c.reply("250 Okay, I'll believe you for now")
 	case DATA:
 		// c.curcmd == DATA both when we've received the
